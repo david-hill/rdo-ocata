@@ -1,4 +1,4 @@
-heat_template_version: 2016-10-14
+heat_template_version: ocata
 
 description: >
   OpenStack Nova base service. Shared for all Nova services.
@@ -18,6 +18,10 @@ parameters:
     description: Mapping of service endpoint -> protocol. Typically set
                  via parameter_defaults in the resource registry.
     type: json
+  KeystoneRegion:
+    type: string
+    default: 'regionOne'
+    description: Keystone region for endpoint
   NovaPassword:
     description: The password for the nova service and db account, used by nova-api.
     type: string
@@ -66,6 +70,57 @@ parameters:
     type: string
     description: Nova Compute upgrade level
     default: ''
+  NovaCronArchiveDeleteRowsMinute:
+    type: string
+    description: >
+        Cron to move deleted instances to another table - Minute
+    default: '1'
+  NovaCronArchiveDeleteRowsHour:
+    type: string
+    description: >
+        Cron to move deleted instances to another table - Hour
+    default: '0'
+  NovaCronArchiveDeleteRowsMonthday:
+    type: string
+    description: >
+        Cron to move deleted instances to another table - Month Day
+    default: '*'
+  NovaCronArchiveDeleteRowsMonth:
+    type: string
+    description: >
+        Cron to move deleted instances to another table - Month
+    default: '*'
+  NovaCronArchiveDeleteRowsWeekday:
+    type: string
+    description: >
+        Cron to move deleted instances to another table - Week Day
+    default: '*'
+  NovaCronArchiveDeleteRowsMaxRows:
+    type: string
+    description: >
+        Cron to move deleted instances to another table - Max Rows
+    default: '100'
+  NovaCronArchiveDeleteRowsUser:
+    type: string
+    description: >
+        Cron to move deleted instances to another table - User
+    default: 'nova'
+  NovaCronArchiveDeleteRowsDestination:
+    type: string
+    description: >
+        Cron to move deleted instances to another table - Log destination
+    default: '/var/log/nova/nova-rowsflush.log'
+  NovaCronArchiveDeleteRowsUntilComplete:
+    type: boolean
+    description: >
+        Cron to move deleted instances to another table - Until complete
+    default: false
+  NovaPlacementAPIInterface:
+    type: string
+    description: >
+        Endpoint interface to be used for the placement API.
+    default: 'internal'
+
 conditions:
 
   compute_upgrade_level_empty: {equals : [{get_param: UpgradeLevelNovaCompute}, '']}
@@ -81,6 +136,11 @@ outputs:
           nova::rabbit_userid: {get_param: RabbitUserName}
           nova::rabbit_use_ssl: {get_param: RabbitClientUseSSL}
           nova::rabbit_port: {get_param: RabbitClientPort}
+          nova::placement::project_name: 'service'
+          nova::placement::password: {get_param: NovaPassword}
+          nova::placement::auth_url: {get_param: [EndpointMap, KeystoneInternal, uri_no_suffix]}
+          nova::placement::os_region_name: {get_param: KeystoneRegion}
+          nova::placement::os_interface: {get_param: NovaPlacementAPIInterface}
           nova::database_connection:
             list_join:
               - ''
@@ -90,6 +150,7 @@ outputs:
                 - '@'
                 - {get_param: [EndpointMap, MysqlInternal, host]}
                 - '/nova'
+                - '?read_default_file=/etc/my.cnf.d/tripleo.cnf&read_default_group=tripleo'
           nova::api_database_connection:
             list_join:
               - ''
@@ -99,10 +160,22 @@ outputs:
                 - '@'
                 - {get_param: [EndpointMap, MysqlInternal, host]}
                 - '/nova_api'
+                - '?read_default_file=/etc/my.cnf.d/tripleo.cnf&read_default_group=tripleo'
+          nova::placement_database_connection:
+            list_join:
+              - ''
+              - - {get_param: [EndpointMap, MysqlInternal, protocol]}
+                - '://nova_placement:'
+                - {get_param: NovaPassword}
+                - '@'
+                - {get_param: [EndpointMap, MysqlInternal, host]}
+                - '/nova_placement'
+                - '?read_default_file=/etc/my.cnf.d/tripleo.cnf&read_default_group=tripleo'
           nova::debug: {get_param: Debug}
           nova::purge_config: {get_param: EnableConfigPurge}
           nova::network::neutron::neutron_project_name: 'service'
           nova::network::neutron::neutron_username: 'neutron'
+          nova::network::neutron::neutron_region_name: {get_param: KeystoneRegion}
           nova::network::neutron::dhcp_domain: ''
           nova::network::neutron::neutron_password: {get_param: NeutronPassword}
           nova::network::neutron::neutron_url: {get_param: [EndpointMap, NeutronInternal, uri]}
@@ -118,8 +191,27 @@ outputs:
           nova::glance_api_servers: {get_param: [EndpointMap, GlanceInternal, uri]}
           nova::use_ipv6: {get_param: NovaIPv6}
           nova::network::neutron::neutron_ovs_bridge: {get_param: NovaOVSBridge}
-        - 
+          nova::cron::archive_deleted_rows::minute: {get_param: NovaCronArchiveDeleteRowsMinute}
+          nova::cron::archive_deleted_rows::hour: {get_param: NovaCronArchiveDeleteRowsHour}
+          nova::cron::archive_deleted_rows::monthday: {get_param: NovaCronArchiveDeleteRowsMonthday}
+          nova::cron::archive_deleted_rows::month: {get_param: NovaCronArchiveDeleteRowsMonth}
+          nova::cron::archive_deleted_rows::weekday: {get_param: NovaCronArchiveDeleteRowsWeekday}
+          nova::cron::archive_deleted_rows::max_rows: {get_param: NovaCronArchiveDeleteRowsMaxRows}
+          nova::cron::archive_deleted_rows::user: {get_param: NovaCronArchiveDeleteRowsUser}
+          nova::cron::archive_deleted_rows::destination: {get_param: NovaCronArchiveDeleteRowsDestination}
+          nova::cron::archive_deleted_rows::until_complete: {get_param: NovaCronArchiveDeleteRowsUntilComplete}
+        -
           if:
           - compute_upgrade_level_empty
           - {}
           - nova::upgrade_level_compute: {get_param: UpgradeLevelNovaCompute}
+      service_config_settings:
+        mysql:
+          # NOTE(aschultz): this should be configurable if/when we support more
+          # complex cell v2 configurations. For now, this is the default cell
+          # created for the cell v2 configuration
+          nova::db::mysql_api::setup_cell0: true
+          nova::rabbit_password: {get_param: RabbitPassword}
+          nova::rabbit_userid: {get_param: RabbitUserName}
+          nova::rabbit_use_ssl: {get_param: RabbitClientUseSSL}
+          nova::rabbit_port: {get_param: RabbitClientPort}

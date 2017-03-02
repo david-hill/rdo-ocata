@@ -1,4 +1,4 @@
-heat_template_version: 2016-10-14
+heat_template_version: ocata
 
 description: >
   Horizon service configured with Puppet
@@ -27,6 +27,14 @@ parameters:
     description: A list of IP/Hostname for the server Horizon is running on.
                  Used for header checks.
     type: comma_delimited_list
+  HorizonPasswordValidator:
+    description: Regex for password validation
+    type: string
+    default: ''
+  HorizonPasswordValidatorHelp:
+    description: Help text for password validation
+    type: string
+    default: ''
   HorizonSecret:
     description: Secret key for Django
     type: string
@@ -58,8 +66,10 @@ outputs:
               dport:
                 - 80
                 - 443
+          horizon::enable_secure_proxy_ssl_header: true
           horizon::disable_password_reveal: true
           horizon::enforce_password_check: true
+          horizon::disallow_iframe_embed: true
           horizon::cache_backend: django.core.cache.backends.memcached.MemcachedCache
           horizon::django_session_engine: 'django.contrib.sessions.backends.cache'
           horizon::vhost_extra_params:
@@ -69,6 +79,8 @@ outputs:
             options: ['FollowSymLinks','MultiViews']
           horizon::bind_address: {get_param: [ServiceNetMap, HorizonNetwork]}
           horizon::keystone_url: {get_param: [EndpointMap, KeystoneInternal, uri]}
+          horizon::password_validator: {get_param: [HorizonPasswordValidator]}
+          horizon::password_validator_help: {get_param: [HorizonPasswordValidatorHelp]}
           horizon::secret_key:
             yaql:
               expression: $.data.passwords.where($ != '').first()
@@ -84,3 +96,19 @@ outputs:
           - horizon::django_debug: {get_param: Debug}
       step_config: |
         include ::tripleo::profile::base::horizon
+      # Ansible tasks to handle upgrade
+      upgrade_tasks:
+        - name: Check if httpd is deployed
+          command: systemctl is-enabled httpd
+          tags: step0,validation
+          ignore_errors: True
+          register: httpd_enabled
+        - name: "PreUpgrade step0,validation: Check if httpd is running"
+          shell: >
+            /usr/bin/systemctl show 'httpd' --property ActiveState |
+            grep '\bactive\b'
+          when: httpd_enabled.rc == 0
+          tags: step0,validation
+        - name: Stop Horizon (under httpd)
+          tags: step2
+          service: name=httpd state=stopped

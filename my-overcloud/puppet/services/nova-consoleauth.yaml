@@ -1,4 +1,4 @@
-heat_template_version: 2016-04-08
+heat_template_version: ocata
 
 description: >
   OpenStack Nova Consoleauth service configured with Puppet
@@ -48,3 +48,7 @@ outputs:
         get_attr: [NovaBase, role_data, config_settings]
       step_config: |
         include tripleo::profile::base::nova::consoleauth
+      upgrade_tasks:
+        - name: Stop nova_consoleauth service
+          tags: step2
+          service: name=openstack-nova-consoleauth state=stopped

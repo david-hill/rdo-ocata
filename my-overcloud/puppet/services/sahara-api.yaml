@@ -1,4 +1,4 @@
-heat_template_version: 2016-04-08
+heat_template_version: ocata
 
 description: >
   OpenStack Sahara API service configured with Puppet
@@ -90,3 +90,7 @@ outputs:
           sahara::db::mysql::allowed_hosts:
             - '%'
             - "%{hiera('mysql_bind_host')}"
+      upgrade_tasks:
+        - name: Stop sahara_api service
+          tags: step2
+          service: name=openstack-sahara-api state=stopped

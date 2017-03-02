@@ -1,4 +1,4 @@
-heat_template_version: 2016-04-08
+heat_template_version: ocata
 
 description: >
   Manila-api service configured with Puppet
@@ -49,7 +49,7 @@ outputs:
           - get_attr: [ManilaBase, role_data, config_settings]
           - manila::keystone::authtoken::password: {get_param: ManilaPassword}
             manila::keystone::authtoken::auth_uri: {get_param: [EndpointMap, KeystoneInternal, uri]}
-            manila::keystone::authtoken::auth_url: { get_param: [EndpointMap, KeystoneAdmin, uri_no_suffix] }
+            manila::keystone::authtoken::auth_url: { get_param: [EndpointMap, KeystoneInternal, uri_no_suffix] }
             manila::keystone::authtoken::project_name: 'service'
             tripleo.manila_api.firewall_rules:
               '150 manila':
@@ -64,6 +64,7 @@ outputs:
             # internal_api_subnet - > IP/CIDR
             manila::api::bind_host: {get_param: [ServiceNetMap, ManilaApiNetwork]}
             manila::api::enable_proxy_headers_parsing: true
+            manila::api::default_share_type: 'default'
       step_config: |
         include ::tripleo::profile::base::manila::api
       service_config_settings:

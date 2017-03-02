@@ -1,4 +1,4 @@
-heat_template_version: 2016-04-08
+heat_template_version: ocata
 
 description: >
   OpenStack Nova Scheduler service configured with Puppet
@@ -63,3 +63,7 @@ outputs:
             nova::scheduler::filter::scheduler_default_filters: {get_param: NovaSchedulerDefaultFilters}
       step_config: |
         include tripleo::profile::base::nova::scheduler
+      upgrade_tasks:
+        - name: Stop nova_scheduler service
+          tags: step2
+          service: name=openstack-nova-scheduler state=stopped

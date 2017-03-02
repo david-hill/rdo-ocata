@@ -10,6 +10,11 @@
 echo "Started yum_update.sh on server $deploy_server_id at `date`"
 echo -n "false" > $heat_outputs_path.update_managed_packages
 
+if [ -f /.dockerenv ]; then
+    echo "Not running due to running inside a container"
+    exit 0
+fi
+
 if [[ -z "$update_identifier" ]]; then
     echo "Not running due to unset update_identifier"
     exit 0
@@ -42,7 +47,7 @@ if [[ "$list_updates" == "" ]]; then
     exit 0
 fi
 
-pacemaker_status=$(systemctl is-active pacemaker)
+pacemaker_status=$(systemctl is-active pacemaker || :)
 
 # Fix the redis/rabbit resource start/stop timeouts. See https://bugs.launchpad.net/tripleo/+bug/1633455
 # and https://bugs.launchpad.net/tripleo/+bug/1634851
@@ -63,18 +68,7 @@ if [[ "$pacemaker_status" == "active" && \
 fi
 
 # Special-case OVS for https://bugs.launchpad.net/tripleo/+bug/1635205
-if [[ -n $(rpm -q --scripts openvswitch | awk '/postuninstall/,/*/' | grep "systemctl.*try-restart") ]]; then
-    echo "Manual upgrade of openvswitch - restart in postun detected"
-    mkdir OVS_UPGRADE || true
-    pushd OVS_UPGRADE
-    echo "Attempting to downloading latest openvswitch with yumdownloader"
-    yumdownloader --resolve openvswitch
-    echo "Updating openvswitch with nopostun option"
-    rpm -U --replacepkgs --nopostun ./*.rpm
-    popd
-else
-    echo "Skipping manual upgrade of openvswitch - no restart in postun detected"
-fi
+special_case_ovs_upgrade_if_needed
 
 if [[ "$pacemaker_status" == "active" ]] ; then
     echo "Pacemaker running, stopping cluster node and doing full package update"

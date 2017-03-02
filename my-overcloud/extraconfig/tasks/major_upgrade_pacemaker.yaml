@@ -1,4 +1,4 @@
-heat_template_version: 2016-10-14
+heat_template_version: ocata
 description: 'Upgrade for Pacemaker deployments'
 
 parameters:
@@ -18,10 +18,6 @@ parameters:
     constraints:
     - allowed_values: ['auto', 'yes', 'no']
     default: 'auto'
-  IgnoreCephUpgradeWarnings:
-    type: boolean
-    default: false
-    description: If enabled, Ceph upgrade will be forced even though cluster or PGs status is not clean
   KeepSaharaServicesOnUpgrade:
     type: boolean
     default: true
@@ -32,33 +28,6 @@ resources:
   # TODO(jistr): for Mitaka->Newton upgrades and further we can use
   # map_merge with input_values instead of feeding params into scripts
   # via str_replace on bash snippets
-
-  CephMonUpgradeConfig:
-    type: OS::Heat::SoftwareConfig
-    properties:
-      group: script
-      config:
-        list_join:
-        - ''
-        - - str_replace:
-              template: |
-                #!/bin/bash
-                ignore_ceph_upgrade_warnings='IGNORE_CEPH_UPGRADE_WARNINGS'
-              params:
-                IGNORE_CEPH_UPGRADE_WARNINGS: {get_param: IgnoreCephUpgradeWarnings}
-          - get_file: major_upgrade_ceph_mon.sh
-
-  CephMonUpgradeDeployment:
-    type: OS::Heat::SoftwareDeploymentGroup
-    properties:
-      servers: {get_param: [servers, Controller]}
-      config: {get_resource: CephMonUpgradeConfig}
-      input_values: {get_param: input_values}
-    update_policy:
-      batch_create:
-        max_batch_size: 1
-      rolling_update:
-        max_batch_size: 1
 
   ControllerPacemakerUpgradeConfig_Step1:
     type: OS::Heat::SoftwareConfig
@@ -86,24 +55,9 @@ resources:
 
   ControllerPacemakerUpgradeDeployment_Step1:
     type: OS::Heat::SoftwareDeploymentGroup
-    depends_on: CephMonUpgradeDeployment
     properties:
       servers:  {get_param: [servers, Controller]}
       config: {get_resource: ControllerPacemakerUpgradeConfig_Step1}
-      input_values: {get_param: input_values}
-
-  BlockStorageUpgradeConfig:
-    type: OS::Heat::SoftwareConfig
-    depends_on: ControllerPacemakerUpgradeDeployment_Step1
-    properties:
-      group: script
-      config: {get_file: major_upgrade_block_storage.sh}
-
-  BlockStorageUpgradeDeployment:
-    type: OS::Heat::SoftwareDeploymentGroup
-    properties:
-      servers:  {get_param: [servers, BlockStorage]}
-      config: {get_resource: BlockStorageUpgradeConfig}
       input_values: {get_param: input_values}
 
   ControllerPacemakerUpgradeConfig_Step2:
@@ -132,7 +86,7 @@ resources:
 
   ControllerPacemakerUpgradeDeployment_Step2:
     type: OS::Heat::SoftwareDeploymentGroup
-    depends_on: BlockStorageUpgradeDeployment
+    depends_on: ControllerPacemakerUpgradeDeployment_Step1
     properties:
       servers:  {get_param: [servers, Controller]}
       config: {get_resource: ControllerPacemakerUpgradeConfig_Step2}

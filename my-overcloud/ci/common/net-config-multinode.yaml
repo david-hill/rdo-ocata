@@ -1,4 +1,4 @@
-heat_template_version: 2015-04-30
+heat_template_version: ocata
 
 description: >
   Software Config to drive os-net-config for a simple bridge configured
@@ -47,7 +47,9 @@ resources:
         str_replace:
           template: |
             #!/bin/bash
-            ip addr add CONTROLPLANEIP/CONTROLPLANESUBNETCIDR dev $bridge_name
+            if ! ip addr show dev $bridge_name | grep CONTROLPLANEIP/CONTROLPLANESUBNETCIDR; then
+                ip addr add CONTROLPLANEIP/CONTROLPLANESUBNETCIDR dev $bridge_name
+            fi
           params:
             CONTROLPLANEIP: {get_param: ControlPlaneIp}
             CONTROLPLANESUBNETCIDR: {get_param: ControlPlaneSubnetCidr}

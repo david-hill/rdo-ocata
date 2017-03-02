@@ -1,4 +1,4 @@
-heat_template_version: 2016-04-08
+heat_template_version: ocata
 
 description: >
   OpenStack Ironic API configured with Puppet
@@ -25,6 +25,10 @@ parameters:
   MonitoringSubscriptionIronicApi:
     default: 'overcloud-ironic-api'
     type: string
+  KeystoneRegion:
+    type: string
+    default: 'regionOne'
+    description: Keystone region for endpoint
 
 resources:
   IronicBase:
@@ -47,7 +51,7 @@ outputs:
             ironic::api::authtoken::project_name: 'service'
             ironic::api::authtoken::username: 'ironic'
             ironic::api::authtoken::auth_uri: {get_param: [EndpointMap, KeystoneInternal, uri] }
-            ironic::api::authtoken::auth_url: {get_param: [EndpointMap, KeystoneAdmin, uri_no_suffix]}
+            ironic::api::authtoken::auth_url: {get_param: [EndpointMap, KeystoneInternal, uri_no_suffix]}
             # NOTE: bind IP is found in Heat replacing the network name with the
             # local node IP for the given network; replacement examples
             # (eg. for internal_api):
@@ -73,6 +77,7 @@ outputs:
           ironic::keystone::auth::auth_name: 'ironic'
           ironic::keystone::auth::password: {get_param: IronicPassword }
           ironic::keystone::auth::tenant: 'service'
+          ironic::keystone::auth::region: {get_param: KeystoneRegion}
         mysql:
           ironic::db::mysql::password: {get_param: IronicPassword}
           ironic::db::mysql::user: ironic
@@ -81,3 +86,7 @@ outputs:
           ironic::db::mysql::allowed_hosts:
             - '%'
             - "%{hiera('mysql_bind_host')}"
+      upgrade_tasks:
+        - name: Stop ironic_api service
+          tags: step2
+          service: name=openstack-ironic-api state=stopped

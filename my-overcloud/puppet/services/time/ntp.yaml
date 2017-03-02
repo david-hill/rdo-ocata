@@ -1,4 +1,4 @@
-heat_template_version: 2016-04-08
+heat_template_version: ocata
 
 description: >
   NTP service deployment using puppet, this YAML file
@@ -22,8 +22,10 @@ parameters:
                  via parameter_defaults in the resource registry.
     type: json
   NtpServer:
-    default: []
-    description: NTP servers
+    default: ['pool.ntp.org']
+    description: NTP servers list. Defaulted to pool.ntp.org in order to
+                 have a sane default for Pacemaker deployments when
+                 not configuring this parameter by default.
     type: comma_delimited_list
 
 outputs:
@@ -38,4 +40,4 @@ outputs:
             dport: 123
             proto: udp
       step_config: |
-        include ::ntp
+        include ::tripleo::profile::base::time::ntp

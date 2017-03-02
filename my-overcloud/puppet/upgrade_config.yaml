@@ -1,4 +1,4 @@
-heat_template_version: 2016-10-14
+heat_template_version: ocata
 description: 'Upgrade for via ansible by applying a step related tag'
 
 parameters:
@@ -10,6 +10,11 @@ parameters:
   step:
     type: string
     description: Step number of the upgrade
+
+  SkipUpgradeConfigTags:
+    type: comma_delimited_list
+    description: Ansible tags to skip during upgrade, e.g validation skips pre-upgrade validations
+    default: []
 
 resources:
 
@@ -30,11 +35,16 @@ resources:
     properties:
       group: ansible
       options:
+        skip_tags:
+          list_join:
+            - ","
+            - {get_param: SkipUpgradeConfigTags}
         tags:
           str_replace:
-            template: "stepSTEP"
+            template: "common,stepSTEP"
             params:
               STEP: {get_param: step}
+        modulepath: /usr/share/ansible-modules
       inputs:
       - name: role
       config: {get_attr: [AnsibleConfig, value]}

@@ -1,4 +1,4 @@
-heat_template_version: 2016-04-08
+heat_template_version: ocata
 
 description: >
   Openstack Manila base service. Shared by manila-api/scheduler/share services
@@ -67,6 +67,7 @@ outputs:
             - '@'
             - {get_param: [EndpointMap, MysqlInternal, host]}
             - '/manila'
+            - '?read_default_file=/etc/my.cnf.d/tripleo.cnf&read_default_group=tripleo'
       service_config_settings:
         mysql:
           manila::db::mysql::password: {get_param: ManilaPassword}

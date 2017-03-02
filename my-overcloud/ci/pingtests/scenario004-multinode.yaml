@@ -1,4 +1,4 @@
-heat_template_version: 2013-05-23
+heat_template_version: ocata
 
 description: >
   HOT template to created resources deployed by scenario004.
@@ -117,6 +117,18 @@ resources:
     properties:
       ram: 512
       vcpus: 1
+
+  manila_share_type:
+    type: OS::Manila::ShareType
+    properties:
+      name: default
+      driver_handles_share_servers: false
+
+  manila_share:
+    type: OS::Manila::Share
+    properties:
+      share_protocol: CEPHFS
+      size: 1
 
 outputs:
   server1_private_ip:
