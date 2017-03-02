@@ -160,6 +160,16 @@ topics:
             description: Deploy Mistral service
             requires:
               - overcloud-resource-registry-puppet.yaml
+      - title: Ceilometer Api
+        description:
+        environments:
+          - file: environments/services/disable-ceilometer-api.yaml
+            title: Ceilometer Api
+            description: Disable Ceilometer Api service. This service is
+              deprecated and will be removed in future releases. Please move
+              to using gnocchi/aodh/panko apis instead.
+            requires:
+              - overcloud-resource-registry-puppet.yaml
 
   # - title: Network Interface Configuration
   #   description:
@@ -355,6 +365,16 @@ topics:
             description: Enables PLUMgrid extensions
             requires:
               - overcloud-resource-registry-puppet.yaml
+          - file: environments/neutron-ml2-fujitsu-cfab.yaml
+            title: Fujitsu Neutron plugin for C-Fabric
+            description: Enable C-Fabric in the overcloud
+            requires:
+              - overcloud-resource-registry-puppet.yaml
+          - file: environments/neutron-ml2-fujitsu-fossw.yaml
+            title: Fujitsu Neutron plugin for FOS
+            description: Enable FOS in the overcloud
+            requires:
+              - overcloud-resource-registry-puppet.yaml
 
   - title: Nova Extensions
     description:
@@ -393,42 +413,90 @@ topics:
             requires:
               - overcloud-resource-registry-puppet.yaml
           - file: environments/cinder-dellsc-config.yaml
-            title: Cinder Dell Storage Center ISCSI backend
+            title: Cinder Dell EMC Storage Center ISCSI backend
             description: >
-              Enables a Cinder Dell Storage Center ISCSI backend, configured
+              Enables a Cinder Dell EMC Storage Center ISCSI backend,
+              configured via puppet
+            requires:
+              - overcloud-resource-registry-puppet.yaml
+          - file: environments/cinder-hpelefthand-config.yaml
+            title: Cinder HPELeftHandISCSI backend
+            description: >
+              Enables a Cinder HPELeftHandISCSI backend, configured
               via puppet
             requires:
               - overcloud-resource-registry-puppet.yaml
-          - file: environments/cinder-eqlx-config.yaml
-            title: Cinder EQLX backend
+          - file: environments/cinder-dellps-config.yaml
+            title: Cinder Dell EMC PS Series backend
             description: >
-              Enables a Cinder EQLX backend, configured via puppet
+              Enables a Cinder Dell EMC PS Series backend,
+              configured via puppet
             requires:
               - overcloud-resource-registry-puppet.yaml
-      - title: Externally managed Ceph
+          - file: environments/cinder-iser.yaml
+            title: Cinder iSER backend
+            description: >
+              Enable a Cinder iSER RDMA backend, configured via puppet
+          - file: environments/cinder-scaleio-config.yaml
+            title: Cinder Dell EMC ScaleIO backend
+            description: >
+              Enables a Cinder Dell EMC ScaleIO backend,
+              configured via puppet
+            requires:
+              - overcloud-resource-registry-puppet.yaml
+      - title: Ceph
         description: >
-          Enable the use of an externally managed Ceph cluster
+          Enable the use of Ceph in the overcloud
         environments:
           - file: environments/puppet-ceph-external.yaml
             title: Externally managed Ceph
-            description:
+            description: >
+              Configures the overcloud to use an externally managed Ceph cluster, via RBD driver.
             requires:
               - overcloud-resource-registry-puppet.yaml
-      - title: Ceph Devel
+          - file: environments/puppet-ceph.yaml
+            title: TripleO managed Ceph
+            description: >
+              Deploys a Ceph cluster via TripleO, requires at lease one CephStorage node or
+              use of hyperconverged-ceph.yaml environment for the HCI scenario, where CephOSD is
+              colocated with NovaCompute and configures the overcloud to use it, via RBD driver.
+            requires:
+              - overcloud-resource-registry-puppet.yaml
+      - title: CephMDS
         description: >
-          Enable a Ceph storage cluster using the controller and 2 ceph nodes.
-          Rbd backends are enabled for Cinder, Glance, and Nova.
+          Deploys CephMDS via TripleO, an additional Ceph service needed to create shared
+          filesystems hosted in Ceph.
         environments:
-          - file: environments/puppet-ceph-devel.yaml
-            title: Ceph Devel
+          - file: environments/services/ceph-mds.yaml
+            title: Deploys CephMDS
             description:
+            requires:
+              - environments/puppet-ceph.yaml
+      - title: Ceph Rados Gateway
+        description: >
+          Deploys CephRGW via TripleO, transparently replaces Swift providing a compatible API
+          which stores data in the Ceph cluster.
+        environments:
+          - file: environments/ceph-radosgw.yaml
+            title: Deploys CephRGW
+            description:
+            requires:
+              - environments/puppet-ceph.yaml
+      - title: Manila with CephFS
+        description: >
+          Deploys Manila and configures it with the CephFS driver. This requires the deployment of
+          Ceph and CephMDS from TripleO or the use of an external Ceph cluster for the overcloud.
+        environments:
+          - file: environments/manila-cephfsnative-config.yaml
+            title: Deploys Manila with CephFS driver
+            description: Deploys Manila and configures CephFS as its default backend.
             requires:
               - overcloud-resource-registry-puppet.yaml
       - title: Storage Environment
         description: >
           Can be used to set up storage backends. Defaults to Ceph used as a
-          backend for Cinder, Glance and Nova ephemeral storage. It configures
-          for example which services will use Ceph, or if any of the services
+          backend for Cinder, Glance, Nova ephemeral storage and Gnocchi. It
+          configures which services will use Ceph, or if any of the services
           will use NFS. And more. Usually requires to be edited by user first.
         tags:
           - no-gui
@@ -501,6 +569,34 @@ topics:
         environments:
           - file: environments/logging-environment.yaml
             title: Enable fluentd client
+            description:
+            requires:
+              - overcloud-resource-registry-puppet.yaml
+
+  - title: Security Options
+    description: Security Hardening Options
+    environment_groups:
+      - title: SSH Banner Text
+        description: Enables population of SSH Banner Text
+        environments:
+          - file: environments/sshd-banner.yaml
+            title: SSH Banner Text
+            description:
+            requires:
+              - overcloud-resource-registry-puppet.yaml
+      - title: Horizon Password Validation
+        description: Enable Horizon Password validation
+        environments:
+          - file: environments/horizon_password_validation.yaml
+            title: Horizon Password Validation
+            description:
+            requires:
+              - overcloud-resource-registry-puppet.yaml
+      - title: AuditD Rules
+        description:  Management of AuditD rules
+        environments:
+          - file: environments/auditd.yaml
+            title: AuditD Rule Management
             description:
             requires:
               - overcloud-resource-registry-puppet.yaml

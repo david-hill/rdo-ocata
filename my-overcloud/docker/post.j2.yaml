@@ -1,4 +1,4 @@
-heat_template_version: 2016-10-14
+heat_template_version: ocata
 
 description: >
   Post-deploy configuration steps via puppet for all roles,
@@ -8,7 +8,6 @@ parameters:
   servers:
     type: json
     description: Mapping of Role name e.g Controller to a list of servers
-
   role_data:
     type: json
     description: Mapping of Role name e.g Controller to the per-role data
@@ -19,33 +18,11 @@ parameters:
     description: >
       Setting this to a unique value will re-run any deployment tasks which
       perform configuration on a Heat stack-update.
-
-  DockerNamespace:
-    description: namespace
-    default: 'tripleoupstream'
-    type: string
-
-  DockerOpenvswitchDBImage:
-    description: image
-    default: 'centos-binary-openvswitch-db-server'
-    type: string
-
-  DockerOvsVswitchdImage:
-    description: image
-    default: 'centos-binary-openvswitch-vswitchd'
-    type: string
-
-  LibvirtConfig:
-    type: string
-    default: "/etc/libvirt/libvirtd.conf"
-
-  NovaConfig:
-    type: string
-    default: "/etc/nova/nova.conf,/etc/nova/rootwrap.conf"
-
-  NeutronOpenvswitchAgentConfig:
-    type: string
-    default: "/etc/neutron/neutron.conf,/etc/neutron/plugins/openvswitch/ovs_neutron_plugin.ini"
+  EndpointMap:
+    default: {}
+    description: Mapping of service endpoint -> protocol. Typically set
+                 via parameter_defaults in the resource registry.
+    type: json
 
 resources:
 
@@ -184,98 +161,24 @@ resources:
       servers: {get_param: [servers, {{role.name}}]}
       config: {get_resource: CopyEtcConfig}
 
-  CopyJsonConfig:
-    type: OS::Heat::SoftwareConfig
-    properties:
-      group: script
-      inputs:
-      - name: libvirt_config
-      - name: nova_config
-      - name: neutron_openvswitch_agent_config
-      config: {get_file: ../docker/copy-json.py}
-
-  CopyJsonDeployment:
-    type: OS::Heat::SoftwareDeploymentGroup
+  {{role.name}}KollaJsonConfig:
+    type: OS::Heat::StructuredConfig
     depends_on: CopyEtcDeployment
     properties:
-      name: CopyJsonDeployment
-      config: {get_resource: CopyJsonConfig}
-      servers: {get_param: [servers, {{role.name}}]}
-      input_values:
-        libvirt_config: {get_param: LibvirtConfig}
-        nova_config: {get_param: NovaConfig}
-        neutron_openvswitch_agent_config: {get_param: NeutronOpenvswitchAgentConfig}
-
-  NovaComputeContainersDeploymentOVS:
-    type: OS::Heat::StructuredDeploymentGroup
-    depends_on: CopyJsonDeployment
-    properties:
-      name: NovaComputeContainersDeploymentOVS
-      config: {get_resource: NovaComputeContainersConfigOVS}
-      servers: {get_param: [servers, {{role.name}}]}
-
-  NovaComputeContainersConfigOVS:
-    type: OS::Heat::StructuredConfig
-    properties:
-      group: docker-cmd
+      group: json-file
       config:
-        openvswitchdb:
-          image:
-            list_join:
-              - '/'
-              - [ {get_param: DockerNamespace}, {get_param: DockerOpenvswitchDBImage} ]
-          net: host
-          restart: always
-          volumes:
-            - /var/lib/etc-data/json-config/ovsdb-server.json:/var/lib/kolla/config_files/config.json
-            - /etc/localtime:/etc/localtime:ro
-            - /run:/run
-            - logs:/var/log/kolla/
-            - openvswitch_db:/var/lib/openvswitch/
-          environment:
-            - KOLLA_CONFIG_STRATEGY=COPY_ALWAYS
+        {get_param: [role_data, {{role.name}}, kolla_config]}
 
-        ovsvswitchd:
-          image:
-            list_join:
-              - '/'
-              - [ {get_param: DockerNamespace}, {get_param: DockerOvsVswitchdImage} ]
-          net: host
-          privileged: true
-          restart: always
-          volumes:
-            - /var/lib/etc-data/json-config/ovs-vswitchd.json:/var/lib/kolla/config_files/config.json
-            - /etc/localtime:/etc/localtime:ro
-            - /lib/modules:/lib/modules:ro
-            - /run:/run
-            - logs:/var/log/kolla/
-          environment:
-            - KOLLA_CONFIG_STRATEGY=COPY_ALWAYS
-
-  NovaComputeContainersDeploymentNetconfig:
+  {{role.name}}KollaJsonDeployment:
     type: OS::Heat::SoftwareDeploymentGroup
-    depends_on: NovaComputeContainersDeploymentOVS
     properties:
-      name: NovaComputeContainersDeploymentNetconfig
-      config: {get_resource: NovaComputeContainersConfigNetconfig}
+      name: {{role.name}}KollaJsonDeployment
+      config: {get_resource: {{role.name}}KollaJsonConfig}
       servers: {get_param: [servers, {{role.name}}]}
-
-  # We run os-net-config here because we depend on the ovs containers to be up
-  # and running before we configure the network.  This allows explicit timing
-  # of the network configuration.
-  NovaComputeContainersConfigNetconfig:
-    type: OS::Heat::SoftwareConfig
-    properties:
-      group: script
-      outputs:
-      - name: result
-      config: |
-        #!/bin/bash
-        /usr/local/bin/run-os-net-config
 
   {{role.name}}ContainersConfig_Step1:
     type: OS::Heat::StructuredConfig
-    depends_on: CopyJsonDeployment
+    depends_on: {{role.name}}KollaJsonDeployment
     properties:
       group: docker-cmd
       config:
@@ -283,7 +186,7 @@ resources:
 
   {{role.name}}ContainersConfig_Step2:
     type: OS::Heat::StructuredConfig
-    depends_on: CopyJsonDeployment
+    depends_on: {{role.name}}KollaJsonDeployment
     properties:
       group: docker-cmd
       config:
@@ -291,7 +194,7 @@ resources:
 
   {{role.name}}ContainersDeployment_Step1:
     type: OS::Heat::StructuredDeploymentGroup
-    depends_on: [{{role.name}}PreConfig, {{role.name}}ArtifactsDeploy, NovaComputeContainersDeploymentNetconfig]
+    depends_on: [{{role.name}}PreConfig, {{role.name}}ArtifactsDeploy]
     properties:
       name: {{role.name}}ContainersDeployment_Step1
       servers: {get_param: [servers, {{role.name}}]}

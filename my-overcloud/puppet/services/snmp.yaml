@@ -1,4 +1,4 @@
-heat_template_version: 2016-04-08
+heat_template_version: ocata
 
 description: >
   SNMP client configured with Puppet, to facilitate Ceilometer Hardware
@@ -43,3 +43,7 @@ outputs:
             proto: 'udp'
       step_config: |
         include ::tripleo::profile::base::snmp
+      upgrade_tasks:
+        - name: Stop snmp service
+          tags: step2
+          service: name=snmpd state=stopped

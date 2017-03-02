@@ -191,7 +191,7 @@ def template_endpoint_items(config):
 
 def generate_endpoint_map_template(config):
     return collections.OrderedDict([
-        ('heat_template_version', '2015-04-30'),
+        ('heat_template_version', 'ocata'),
         ('description', 'A map of OpenStack endpoints. Since the endpoints '
          'are URLs, we need to have brackets around IPv6 IP addresses. The '
          'inputs to these parameters come from net_ip_uri_map, which will '
@@ -280,8 +280,9 @@ def main():
     try:
         if options.check:
             if not check_up_to_date(options.output_file, options.input_file):
-                print('EndpointMap template does not match input data',
-                      file=sys.stderr)
+                print('EndpointMap template does not match input data. Please '
+                      'run the build_endpoint_map.py tool to update the '
+                      'template.', file=sys.stderr)
                 sys.exit(2)
         else:
             build_endpoint_map(options.output_file, options.input_file)

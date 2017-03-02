@@ -1,4 +1,4 @@
-heat_template_version: 2016-04-08
+heat_template_version: ocata
 
 description: >
   Openstack Zaqar service. Shared for all Heat services.
@@ -40,7 +40,7 @@ outputs:
       config_settings:
         zaqar::keystone::authtoken::password: {get_param: ZaqarPassword}
         zaqar::keystone::authtoken::project_name: 'service'
-        zaqar::keystone::authtoken::auth_url: {get_param: [EndpointMap, KeystoneAdmin, uri_no_suffix]}
+        zaqar::keystone::authtoken::auth_url: {get_param: [EndpointMap, KeystoneInternal, uri_no_suffix]}
         zaqar::keystone::authtoken::auth_uri: {get_param: [EndpointMap, KeystoneInternal, uri]}
         zaqar::debug: {get_param: Debug}
         zaqar::transport::websocket::bind: {get_param: [EndpointMap, ZaqarInternal, host]}
@@ -64,3 +64,18 @@ outputs:
 
       step_config: |
         include ::tripleo::profile::base::zaqar
+      upgrade_tasks:
+        - name: Check if zaqar is deployed
+          command: systemctl is-enabled openstack-zaqar
+          tags: step0,validation
+          ignore_errors: True
+          register: zaqar_enabled
+        - name: "PreUpgrade step0,validation: Check if openstack-zaqar is running"
+          shell: >
+            /usr/bin/systemctl show 'openstack-zaqar' --property ActiveState |
+            grep '\bactive\b'
+          when: zaqar_enabled.rc == 0
+          tags: step0,validation
+        - name: Stop zaqar service
+          tags: step1
+          service: name=openstack-zaqar state=stopped

@@ -1,4 +1,4 @@
-heat_template_version: 2016-04-08
+heat_template_version: ocata
 
 description: >
   OpenStack Sahara base service. Shared for all Sahara services.
@@ -64,6 +64,7 @@ outputs:
               - '@'
               - {get_param: [EndpointMap, MysqlInternal, host]}
               - '/sahara'
+              - '?read_default_file=/etc/my.cnf.d/tripleo.cnf&read_default_group=tripleo'
         sahara::rabbit_password: {get_param: RabbitPassword}
         sahara::rabbit_user: {get_param: RabbitUserName}
         sahara::rabbit_use_ssl: {get_param: RabbitClientUseSSL}
@@ -71,7 +72,7 @@ outputs:
         sahara::debug: {get_param: Debug}
         sahara::admin_password: {get_param: SaharaPassword}
         sahara::auth_uri: {get_param: [EndpointMap, KeystoneInternal, uri] }
-        sahara::identity_uri: { get_param: [EndpointMap, KeystoneAdmin, uri_no_suffix] }
+        sahara::identity_uri: { get_param: [EndpointMap, KeystoneInternal, uri_no_suffix] }
         sahara::use_neutron: true
         sahara::plugins: {get_param: SaharaPlugins}
         sahara::rpc_backend: rabbit

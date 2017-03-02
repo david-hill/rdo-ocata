@@ -6,18 +6,26 @@ resource_registry:
   OS::TripleO::Services::MistralApi: ../../puppet/services/mistral-api.yaml
   OS::TripleO::Services::MistralEngine: ../../puppet/services/mistral-engine.yaml
   OS::TripleO::Services::MistralExecutor: ../../puppet/services/mistral-executor.yaml
+  OS::TripleO::Services::RabbitMQ: ../../puppet/services/pacemaker/rabbitmq.yaml
+  OS::TripleO::Services::HAproxy: ../../puppet/services/pacemaker/haproxy.yaml
+  OS::TripleO::Services::Pacemaker: ../../puppet/services/pacemaker.yaml
+  OS::TripleO::Services::MySQL: ../../puppet/services/pacemaker/database/mysql.yaml
+  OS::TripleO::Services::Keepalived: OS::Heat::None
+  OS::TripleO::Tasks::ControllerPrePuppet: ../../extraconfig/tasks/pre_puppet_pacemaker.yaml
+  OS::TripleO::Tasks::ControllerPostPuppet: ../../extraconfig/tasks/post_puppet_pacemaker.yaml
+  OS::TripleO::Tasks::ControllerPostPuppetRestart: ../../extraconfig/tasks/post_puppet_pacemaker_restart.yaml
 
 parameter_defaults:
   ControllerServices:
     - OS::TripleO::Services::Kernel
     - OS::TripleO::Services::Keystone
     - OS::TripleO::Services::GlanceApi
-    - OS::TripleO::Services::GlanceRegistry
     - OS::TripleO::Services::HeatApi
     - OS::TripleO::Services::HeatApiCfn
     - OS::TripleO::Services::HeatApiCloudwatch
     - OS::TripleO::Services::HeatEngine
     - OS::TripleO::Services::MySQL
+    - OS::TripleO::Services::MySQLClient
     - OS::TripleO::Services::NeutronDhcpAgent
     - OS::TripleO::Services::NeutronL3Agent
     - OS::TripleO::Services::NeutronMetadataAgent
@@ -31,6 +39,7 @@ parameter_defaults:
     - OS::TripleO::Services::Pacemaker
     - OS::TripleO::Services::NovaConductor
     - OS::TripleO::Services::NovaApi
+    - OS::TripleO::Services::NovaPlacement
     - OS::TripleO::Services::NovaMetadata
     - OS::TripleO::Services::NovaScheduler
     - OS::TripleO::Services::Ntp
@@ -43,6 +52,8 @@ parameter_defaults:
     - OS::TripleO::Services::MistralApi
     - OS::TripleO::Services::MistralEngine
     - OS::TripleO::Services::MistralExecutor
+    - OS::TripleO::Services::TripleoPackages
+    - OS::TripleO::Services::TripleoFirewall
   ControllerExtraConfig:
     nova::compute::libvirt::services::libvirt_virt_type: qemu
     nova::compute::libvirt::libvirt_virt_type: qemu
@@ -50,3 +61,4 @@ parameter_defaults:
   # we don't deploy Swift so we switch to file backend.
   GlanceBackend: 'file'
   KeystoneTokenProvider: 'fernet'
+  SwiftCeilometerPipelineEnabled: false

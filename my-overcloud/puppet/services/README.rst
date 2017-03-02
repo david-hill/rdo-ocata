@@ -49,6 +49,32 @@ are re-asserted when applying latter ones.
 
    5) Service activation (Pacemaker)
 
+Batch Upgrade Steps
+-------------------
+
+Each service template may optionally define a `upgrade_batch_tasks` key, which
+is a list of ansible tasks to be performed during the upgrade process.
+
+Similar to the step_config, we allow a series of steps for the per-service
+upgrade sequence, defined as ansible tasks with a tag e.g "step1" for the first
+step, "step2" for the second, etc (currently only two steps are supported, but
+more may be added when required as additional services get converted to batched
+upgrades).
+
+Note that each step is performed in batches, then we move on to the next step
+which is also performed in batches (we don't perform all steps on one node,
+then move on to the next one which means you can sequence rolling upgrades of
+dependent services via the step value).
+
+The tasks performed at each step is service specific, but note that all batch
+upgrade steps are performed before the `upgrade_tasks` described below.  This
+means that all services that support rolling upgrades can be upgraded without
+downtime during `upgrade_batch_tasks`, then any remaining services are stopped
+and upgraded during `upgrade_tasks`
+
+The default batch size is 1, but this can be overridden for each role via the
+`upgrade_batch_size` option in roles_data.yaml
+
 Upgrade Steps
 -------------
 
@@ -65,12 +91,28 @@ step, "step2" for the second, etc.
 
    2) Stop all control-plane services, ready for upgrade
 
-   3) Perform a package update, (either specific packages or the whole system)
+   3) Perform a package update and install new packages: A general
+      upgrade is done, and only new package should go into service
+      ansible tasks.
 
    4) Start services needed for migration tasks (e.g DB)
 
    5) Perform any migration tasks, e.g DB sync commands
 
-   6) Start control-plane services
+Note that the services are not started in the upgrade tasks - we instead re-run
+puppet which does any reconfiguration required for the new version, then starts
+the services.
 
-   7) Any additional online migration tasks (e.g data migrations)
+Nova Server Metadata Settings
+-----------------------------
+
+One can use the hook of type `OS::TripleO::ServiceServerMetadataHook` to pass
+entries to the nova instances' metadata. It is, however, disabled by default.
+In order to overwrite it one needs to define it in the resource registry. An
+implementation of this hook needs to conform to the following:
+
+* It needs to define an input called `RoleData` of json type. This gets as
+  input the contents of the `role_data` for each role's ServiceChain.
+
+* This needs to define an output called `metadata` which will be given to the
+  Nova Server resource as the instance's metadata.

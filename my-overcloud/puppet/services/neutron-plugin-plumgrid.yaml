@@ -1,4 +1,4 @@
-heat_template_version: 2016-04-08
+heat_template_version: ocata
 
 description: >
   OpenStack Neutron Plumgrid plugin
@@ -100,7 +100,8 @@ outputs:
               - '@'
               - {get_param: [EndpointMap, MysqlInternal, host]}
               - '/ovs_neutron'
-        neutron::plugins::plumgrid::controller_priv_host: {get_param: [EndpointMap, KeystoneAdmin, host]}
+              - '?read_default_file=/etc/my.cnf.d/tripleo.cnf&read_default_group=tripleo'
+        neutron::plugins::plumgrid::controller_priv_host: {get_param: [EndpointMap, KeystoneInternal, host]}
         neutron::plugins::plumgrid::admin_password: {get_param: AdminPassword}
         neutron::plugins::plumgrid::metadata_proxy_shared_secret: {get_param: NeutronMetadataProxySharedSecret}
         neutron::plugins::plumgrid::director_server: {get_param: PLUMgridDirectorServer}
