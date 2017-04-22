@@ -23,27 +23,20 @@
     properties:
       StepConfig: {get_param: [role_data, {{role.name}}, step_config]}
 
-  {% if role.name == 'Controller' %}
-  ControllerPrePuppet:
-    type: OS::TripleO::Tasks::ControllerPrePuppet
-    properties:
-      servers: {get_param: [servers, Controller]}
-      input_values:
-        update_identifier: {get_param: DeployIdentifier}
-  {% endif %}
-
-  {% if role.name in ['Controller', 'ObjectStorage'] %}
-  {{role.name}}SwiftRingDeploy:
-    type: OS::TripleO::Tasks::SwiftRingDeploy
+  {{role.name}}PrePuppet:
+    type: OS::TripleO::Tasks::{{role.name}}PrePuppet
     properties:
       servers: {get_param: [servers, {{role.name}}]}
-  {% endif %}
+      input_values:
+        update_identifier: {get_param: DeployIdentifier}
 
   # Step through a series of configuration steps
 {% for step in range(1, 6) %}
   {{role.name}}Deployment_Step{{step}}:
     type: OS::Heat::StructuredDeploymentGroup
-  {% if step == 1 %}
+  {% if step == 1 and role.name == 'Controller' %}
+    depends_on: [ControllerPrePuppet, {{role.name}}PreConfig, {{role.name}}ArtifactsDeploy]
+  {% elif step == 1 and role.name != 'Controller' %}
     depends_on: [{{role.name}}PreConfig, {{role.name}}ArtifactsDeploy]
   {% else %}
     depends_on:
@@ -82,25 +75,12 @@
     properties:
         servers: {get_param: [servers, {{role.name}}]}
 
-  {% if role.name == 'Controller' %}
-  ControllerPostPuppet:
+  {{role.name}}PostPuppet:
     depends_on:
-      - ControllerExtraConfigPost
-    type: OS::TripleO::Tasks::ControllerPostPuppet
-    properties:
-      servers: {get_param: [servers, Controller]}
-      input_values:
-        update_identifier: {get_param: DeployIdentifier}
-  {% endif %}
-
-  {% if role.name in ['Controller', 'ObjectStorage'] %}
-  {{role.name}}SwiftRingUpdate:
-    type: OS::TripleO::Tasks::SwiftRingUpdate
-    depends_on:
-  {% for dep in roles %}
-      - {{dep.name}}Deployment_Step5
-  {% endfor %}
+      - {{role.name}}ExtraConfigPost
+    type: OS::TripleO::Tasks::{{role.name}}PostPuppet
     properties:
       servers: {get_param: [servers, {{role.name}}]}
-  {% endif %}
+      input_values:
+        update_identifier: {get_param: DeployIdentifier}
 {% endfor %}

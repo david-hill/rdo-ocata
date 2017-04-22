@@ -11,9 +11,6 @@ resource_registry:
   OS::TripleO::Tasks::UpdateWorkflow: OS::Heat::None
   OS::TripleO::Tasks::PackageUpdate: extraconfig/tasks/yum_update.yaml
 
-  OS::TripleO::Tasks::SwiftRingDeploy: extraconfig/tasks/swift-ring-deploy.yaml
-  OS::TripleO::Tasks::SwiftRingUpdate: extraconfig/tasks/swift-ring-update.yaml
-
 {% for role in roles %}
   OS::TripleO::{{role.name}}::PreNetworkConfig: OS::Heat::None
   OS::TripleO::{{role.name}}PostDeploySteps: puppet/post.yaml
@@ -69,8 +66,10 @@ resource_registry:
   OS::TripleO::NodeExtraConfig: puppet/extraconfig/pre_deploy/default.yaml
   OS::TripleO::NodeExtraConfigPost: extraconfig/post_deploy/default.yaml
 
-  OS::TripleO::Tasks::ControllerPrePuppet: OS::Heat::None
-  OS::TripleO::Tasks::ControllerPostPuppet: OS::Heat::None
+{% for role in roles %}
+  OS::TripleO::Tasks::{{role.name}}PrePuppet: OS::Heat::None
+  OS::TripleO::Tasks::{{role.name}}PostPuppet: OS::Heat::None
+{% endfor %}
 
   # "AllNodes" Extra cluster config, runs on all nodes prior to the post_deploy
   # phase, e.g when puppet is applied, but after the pre_deploy phase.  Useful when
@@ -237,6 +236,10 @@ resource_registry:
   OS::TripleO::Services::Zaqar: OS::Heat::None
   OS::TripleO::Services::NeutronML2FujitsuCfab: OS::Heat::None
   OS::TripleO::Services::NeutronML2FujitsuFossw: OS::Heat::None
+  OS::TripleO::Services::CinderBackendDellPs: OS::Heat::None
+  OS::TripleO::Services::CinderBackendDellSc: OS::Heat::None
+  OS::TripleO::Services::CinderBackendNetApp: OS::Heat::None
+  OS::TripleO::Services::CinderBackendScaleIO: OS::Heat::None
   OS::TripleO::Services::CinderHPELeftHandISCSI: OS::Heat::None
   OS::TripleO::Services::Etcd: OS::Heat::None
   OS::TripleO::Services::Ec2Api: OS::Heat::None
