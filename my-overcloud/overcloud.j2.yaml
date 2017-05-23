@@ -249,16 +249,6 @@ resources:
       type: json
       value: {get_attr: [EndpointMap, endpoint_map]}
 
-  SshKnownHostsConfig:
-    type: OS::TripleO::Ssh::KnownHostsConfig
-    properties:
-      known_hosts:
-        list_join:
-          - ''
-          {% for role in roles %}
-          - {get_attr: [{{role.name}}, known_hosts_entry]}
-          {% endfor %}
-
   # Jinja loop for Role in roles_data.yaml
 {% for role in roles %}
   # Resources generated for {{role.name}} Role
@@ -276,13 +266,6 @@ resources:
     properties:
       name: {{role.name}}HostsDeployment
       config: {get_attr: [hostsConfig, config_id]}
-      servers: {get_attr: [{{role.name}}, attributes, nova_server_resource]}
-
-  {{role.name}}SshKnownHostsDeployment:
-    type: OS::Heat::StructuredDeployments
-    properties:
-      name: {{role.name}}SshKnownHostsDeployment
-      config: {get_resource: SshKnownHostsConfig}
       servers: {get_attr: [{{role.name}}, attributes, nova_server_resource]}
 
   {{role.name}}AllNodesDeployment:
@@ -584,24 +567,12 @@ resources:
       PingTestIps:
         list_join:
         - ' '
-        - - yaql:
-              expression: coalesce($.data, []).first(null)
-              data: {get_attr: [{{primary_role_name}}, external_ip_address]}
-          - yaql:
-              expression: coalesce($.data, []).first(null)
-              data: {get_attr: [{{primary_role_name}}, internal_api_ip_address]}
-          - yaql:
-              expression: coalesce($.data, []).first(null)
-              data: {get_attr: [{{primary_role_name}}, storage_ip_address]}
-          - yaql:
-              expression: coalesce($.data, []).first(null)
-              data: {get_attr: [{{primary_role_name}}, storage_mgmt_ip_address]}
-          - yaql:
-              expression: coalesce($.data, []).first(null)
-              data: {get_attr: [{{primary_role_name}}, tenant_ip_address]}
-          - yaql:
-              expression: coalesce($.data, []).first(null)
-              data: {get_attr: [{{primary_role_name}}, management_ip_address]}
+        - - {get_attr: [{{primary_role_name}}, resource.0.external_ip_address]}
+          - {get_attr: [{{primary_role_name}}, resource.0.internal_api_ip_address]}
+          - {get_attr: [{{primary_role_name}}, resource.0.storage_ip_address]}
+          - {get_attr: [{{primary_role_name}}, resource.0.storage_mgmt_ip_address]}
+          - {get_attr: [{{primary_role_name}}, resource.0.tenant_ip_address]}
+          - {get_attr: [{{primary_role_name}}, resource.0.management_ip_address]}
 
   UpdateWorkflow:
     type: OS::TripleO::Tasks::UpdateWorkflow
@@ -637,7 +608,6 @@ resources:
   AllNodesDeploySteps:
     type: OS::TripleO::PostDeploySteps
     depends_on:
-      - AllNodesExtraConfig
 {% for role in roles %}
       - {{role.name}}AllNodesDeployment
 {% endfor %}
