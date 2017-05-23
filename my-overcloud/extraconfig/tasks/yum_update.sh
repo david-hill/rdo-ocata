@@ -38,16 +38,50 @@ if [[ -a "$timestamp_file" ]]; then
 fi
 touch "$timestamp_file"
 
+pacemaker_status=""
+# We include word boundaries in order to not match pacemaker_remote
+if hiera -c /etc/puppet/hiera.yaml service_names | grep -q '\bpacemaker\b'; then
+    pacemaker_status=$(systemctl is-active pacemaker)
+fi
+
+# (NB: when backporting this s/pacemaker_short_bootstrap_node_name/bootstrap_nodeid)
+# This runs before the yum_update so we are guaranteed to run it even in the absence
+# of packages to update (the check for -z "$update_identifier" guarantees that this
+# is run only on overcloud stack update -i)
+if [[ "$pacemaker_status" == "active" && \
+        "$(hiera -c /etc/puppet/hiera.yaml pacemaker_short_bootstrap_node_name)" == "$(facter hostname)" ]] ; then \
+    # OCF scripts don't cope with -eu
+    echo "Verifying if we need to fix up any IPv6 VIPs"
+    set +eu
+    fixup_wrong_ipv6_vip
+    ret=$?
+    set -eu
+    if [ $ret -ne 0 ]; then
+        echo "Fixing up IPv6 VIPs failed. Stopping here. (See https://bugs.launchpad.net/tripleo/+bug/1686357 for more info)"
+        exit 1
+    fi
+fi
+
 command_arguments=${command_arguments:-}
 
-list_updates=$(yum list updates)
+# yum check-update exits 100 if updates are available
+set +e
+check_update=$(yum check-update 2>&1)
+check_update_exit=$?
+set -e
 
-if [[ "$list_updates" == "" ]]; then
+if [[ "$check_update_exit" == "1" ]]; then
+    echo "Failed to check for package updates"
+    echo "$check_update"
+    exit 1
+elif [[ "$check_update_exit" != "100" ]]; then
     echo "No packages require updating"
     exit 0
 fi
 
-pacemaker_status=$(systemctl is-active pacemaker || :)
+# TODO: FIXME: remove this in Pike.
+# Hack around mod_ssl update and puppet https://bugs.launchpad.net/tripleo/+bug/1682448
+touch /etc/httpd/conf.d/ssl.conf
 
 # Fix the redis/rabbit resource start/stop timeouts. See https://bugs.launchpad.net/tripleo/+bug/1633455
 # and https://bugs.launchpad.net/tripleo/+bug/1634851
@@ -67,7 +101,7 @@ if [[ "$pacemaker_status" == "active" && \
     fi
 fi
 
-# Special-case OVS for https://bugs.launchpad.net/tripleo/+bug/1635205
+# special case https://bugs.launchpad.net/tripleo/+bug/1635205 +bug/1669714
 special_case_ovs_upgrade_if_needed
 
 if [[ "$pacemaker_status" == "active" ]] ; then
@@ -97,17 +131,6 @@ return_code=$?
 echo "$result"
 echo "yum return code: $return_code"
 
-# Writes any changes caused by alterations to os-net-config and bounces the
-# interfaces *before* restarting the cluster.
-os-net-config -c /etc/os-net-config/config.json -v --detailed-exit-codes
-RETVAL=$?
-if [[ $RETVAL == 2 ]]; then
-    echo "os-net-config: interface configuration files updated successfully"
-elif [[ $RETVAL != 0 ]]; then
-    echo "ERROR: os-net-config configuration failed"
-    exit $RETVAL
-fi
-
 if [[ "$pacemaker_status" == "active" ]] ; then
     echo "Starting cluster node"
     pcs cluster start
@@ -124,15 +147,19 @@ if [[ "$pacemaker_status" == "active" ]] ; then
         fi
     done
 
-    tstart=$(date +%s)
-    while ! clustercheck; do
-        sleep 5
-        tnow=$(date +%s)
-        if (( tnow-tstart > galera_sync_timeout )) ; then
-            echo "ERROR galera sync timed out"
-            exit 1
-        fi
-    done
+    RETVAL=$( pcs resource show galera-master | grep wsrep_cluster_address | grep -q `crm_node -n` ; echo $? )
+
+    if [[ $RETVAL -eq 0 && -e /etc/sysconfig/clustercheck ]]; then
+        tstart=$(date +%s)
+        while ! clustercheck; do
+            sleep 5
+            tnow=$(date +%s)
+            if (( tnow-tstart > galera_sync_timeout )) ; then
+                echo "ERROR galera sync timed out"
+                exit 1
+            fi
+        done
+    fi
 
     echo "Waiting for pacemaker cluster to settle"
     if ! timeout -k 10 $cluster_settle_timeout crm_resource --wait; then
@@ -143,6 +170,7 @@ if [[ "$pacemaker_status" == "active" ]] ; then
     pcs status
 fi
 
-echo "Finished yum_update.sh on server $deploy_server_id at `date`"
+
+echo "Finished yum_update.sh on server $deploy_server_id at `date` with return code: $return_code"
 
 exit $return_code

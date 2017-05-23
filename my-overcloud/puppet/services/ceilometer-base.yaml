@@ -37,7 +37,7 @@ parameters:
     constraints:
     - allowed_values: ['gnocchi', 'database']
   CeilometerEventDispatcher:
-    default: ['gnocchi']
+    default: ['panko', 'gnocchi']
     description: Comma-separated list of Dispatchers to process events data
     type: comma_delimited_list
     constraints:
@@ -76,6 +76,11 @@ parameters:
     default: 5672
     description: Set rabbit subscriber port, change this if using SSL
     type: number
+  CeilometerApiEndpoint:
+    default: true
+    description: Whether to create or skip API endpoint. Set this to
+        false, if you choose to disable Ceilometer API service.
+    type: boolean
 
 outputs:
   role_data:
@@ -123,12 +128,14 @@ outputs:
         ceilometer::telemetry_secret: {get_param: CeilometerMeteringSecret}
       service_config_settings:
         keystone:
+          ceilometer_auth_enabled: true
           ceilometer::keystone::auth::public_url: {get_param: [EndpointMap, CeilometerPublic, uri]}
           ceilometer::keystone::auth::internal_url: {get_param: [EndpointMap, CeilometerInternal, uri]}
           ceilometer::keystone::auth::admin_url: {get_param: [EndpointMap, CeilometerAdmin, uri]}
           ceilometer::keystone::auth::password: {get_param: CeilometerPassword}
           ceilometer::keystone::auth::region: {get_param: KeystoneRegion}
           ceilometer::keystone::auth::tenant: 'service'
+          ceilometer::keystone::auth::configure_endpoint: {get_param: CeilometerApiEndpoint}
         mysql:
           ceilometer::db::mysql::password: {get_param: CeilometerPassword}
           ceilometer::db::mysql::user: ceilometer
