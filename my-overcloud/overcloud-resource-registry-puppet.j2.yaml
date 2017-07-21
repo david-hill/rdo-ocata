@@ -5,13 +5,14 @@ resource_registry:
   OS::TripleO::PostUpgradeSteps: puppet/post-upgrade.yaml
   OS::TripleO::AllNodes::SoftwareConfig: puppet/all-nodes-config.yaml
   OS::TripleO::Hosts::SoftwareConfig: hosts-config.yaml
-  OS::TripleO::Ssh::HostPubKey: extraconfig/tasks/ssh/host_public_key.yaml
-  OS::TripleO::Ssh::KnownHostsConfig: extraconfig/tasks/ssh/known_hosts_config.yaml
   OS::TripleO::DefaultPasswords: default_passwords.yaml
 
   # Tasks (for internal TripleO usage)
   OS::TripleO::Tasks::UpdateWorkflow: OS::Heat::None
   OS::TripleO::Tasks::PackageUpdate: extraconfig/tasks/yum_update.yaml
+
+  OS::TripleO::Tasks::SwiftRingDeploy: extraconfig/tasks/swift-ring-deploy.yaml
+  OS::TripleO::Tasks::SwiftRingUpdate: extraconfig/tasks/swift-ring-update.yaml
 
 {% for role in roles %}
   OS::TripleO::{{role.name}}::PreNetworkConfig: OS::Heat::None
@@ -67,6 +68,9 @@ resource_registry:
   OS::TripleO::NodeTLSData: OS::Heat::None
   OS::TripleO::NodeExtraConfig: puppet/extraconfig/pre_deploy/default.yaml
   OS::TripleO::NodeExtraConfigPost: extraconfig/post_deploy/default.yaml
+
+  OS::TripleO::Tasks::ControllerPrePuppet: OS::Heat::None
+  OS::TripleO::Tasks::ControllerPostPuppet: OS::Heat::None
 
   # "AllNodes" Extra cluster config, runs on all nodes prior to the post_deploy
   # phase, e.g when puppet is applied, but after the pre_deploy phase.  Useful when
@@ -170,7 +174,7 @@ resource_registry:
   OS::TripleO::Services::Memcached: puppet/services/memcached.yaml
   OS::TripleO::Services::SaharaApi: OS::Heat::None
   OS::TripleO::Services::SaharaEngine: OS::Heat::None
-  OS::TripleO::Services::Sshd: puppet/services/sshd.yaml
+  OS::TripleO::Services::Sshd: OS::Heat::None
   OS::TripleO::Services::Redis: puppet/services/database/redis.yaml
   OS::TripleO::Services::NovaConductor: puppet/services/nova-conductor.yaml
   OS::TripleO::Services::MongoDb: puppet/services/database/mongodb.yaml
@@ -233,10 +237,6 @@ resource_registry:
   OS::TripleO::Services::Zaqar: OS::Heat::None
   OS::TripleO::Services::NeutronML2FujitsuCfab: OS::Heat::None
   OS::TripleO::Services::NeutronML2FujitsuFossw: OS::Heat::None
-  OS::TripleO::Services::CinderBackendDellPs: OS::Heat::None
-  OS::TripleO::Services::CinderBackendDellSc: OS::Heat::None
-  OS::TripleO::Services::CinderBackendNetApp: OS::Heat::None
-  OS::TripleO::Services::CinderBackendScaleIO: OS::Heat::None
   OS::TripleO::Services::CinderHPELeftHandISCSI: OS::Heat::None
   OS::TripleO::Services::Etcd: OS::Heat::None
   OS::TripleO::Services::Ec2Api: OS::Heat::None

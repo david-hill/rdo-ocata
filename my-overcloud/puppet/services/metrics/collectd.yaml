@@ -70,9 +70,7 @@ parameters:
   CollectdSecurityLevel:
     type: string
     description: >
-      Security level setting for remote collectd connection. If it is
-      set to Sign or Encrypt the CollectdPassword and CollectdUsername
-      parameters need to be set.
+      Security level setting for remote collectd connection.
     default: 'None'
     constraints:
       - allowed_values:

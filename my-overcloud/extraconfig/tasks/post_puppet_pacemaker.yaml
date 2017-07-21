@@ -10,9 +10,7 @@ parameters:
 
 resources:
 
-{%- for role in roles %}
-  {%- if role.name.lower() == 'controller' %}
-  {{role.name}}PostPuppetMaintenanceModeConfig:
+  ControllerPostPuppetMaintenanceModeConfig:
     type: OS::Heat::SoftwareConfig
     properties:
       group: script
@@ -24,19 +22,16 @@ resources:
             pcs property set maintenance-mode=false
         fi
 
-  {{role.name}}PostPuppetMaintenanceModeDeployment:
+  ControllerPostPuppetMaintenanceModeDeployment:
     type: OS::Heat::SoftwareDeployments
     properties:
-      servers: {get_param: [servers, {{role.name}}]}
-      config: {get_resource: {{role.name}}PostPuppetMaintenanceModeConfig}
+      servers:  {get_param: servers}
+      config: {get_resource: ControllerPostPuppetMaintenanceModeConfig}
       input_values: {get_param: input_values}
 
-  {{role.name}}PostPuppetRestart:
-    type: OS::TripleO::Tasks::{{role.name}}PostPuppetRestart
-    depends_on: {{role.name}}PostPuppetMaintenanceModeDeployment
+  ControllerPostPuppetRestart:
+    type: OS::TripleO::Tasks::ControllerPostPuppetRestart
+    depends_on: ControllerPostPuppetMaintenanceModeDeployment
     properties:
-      servers: {get_param: [servers, {{role.name}}]}
+      servers:  {get_param: servers}
       input_values: {get_param: input_values}
-  {%- endif %}
-{%- endfor %}
-

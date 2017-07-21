@@ -39,7 +39,7 @@ parameters:
     default: 'ceph'
   ManilaCephFSNativeCephFSEnableSnapshots:
     type: boolean
-    default: false
+    default: true
   ManilaCephFSDataPoolName:
     default: manila_data
     type: string
