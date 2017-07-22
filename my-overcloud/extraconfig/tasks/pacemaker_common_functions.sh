@@ -299,9 +299,12 @@ function systemctl_swift {
 }
 
 # Special-case OVS for https://bugs.launchpad.net/tripleo/+bug/1635205
+# Update condition and add --notriggerun for +bug/1669714
 function special_case_ovs_upgrade_if_needed {
-    if [[ -n $(rpm -q --scripts openvswitch | awk '/postuninstall/,/*/' | grep "systemctl.*try-restart") ]]; then
-        echo "Manual upgrade of openvswitch - restart in postun detected"
+    # Always ensure yum has full cache
+    yum makecache || echo "Yum makecache failed. This can cause failure later on."
+    if rpm -qa | grep "^openvswitch-2.5.0-14" || rpm -q --scripts openvswitch | awk '/postuninstall/,/*/' | grep "systemctl.*try-restart" ; then
+        echo "Manual upgrade of openvswitch - ovs-2.5.0-14 or restart in postun detected"
         rm -rf OVS_UPGRADE
         mkdir OVS_UPGRADE && pushd OVS_UPGRADE
         echo "Attempting to downloading latest openvswitch with yumdownloader"
@@ -310,8 +313,8 @@ function special_case_ovs_upgrade_if_needed {
             if rpm -U --test $pkg 2>&1 | grep "already installed" ; then
                 echo "Looks like newer version of $pkg is already installed, skipping"
             else
-                echo "Updating $pkg with nopostun option"
-                rpm -U --replacepkgs --nopostun $pkg
+                echo "Updating $pkg with --nopostun --notriggerun"
+                rpm -U --replacepkgs --nopostun --notriggerun $pkg
             fi
         done
         popd
@@ -321,3 +324,64 @@ function special_case_ovs_upgrade_if_needed {
 
 }
 
+# This code is meant to fix https://bugs.launchpad.net/tripleo/+bug/1686357 on
+# existing setups via a minor update workflow and be idempotent. We need to
+# run this before the yum update because we fix this up even when there are no
+# packages to update on the system (in which case the script exits).
+# This code must be called with set +eu (due to the ocf scripts being sourced)
+function fixup_wrong_ipv6_vip {
+    # This XPath query identifies of all the VIPs in pacemaker with netmask /64. Those are IPv6 only resources that have the wrong netmask
+    # This gives the address of the resource in the CIB, one address per line. For example:
+    # /cib/configuration/resources/primitive[@id='ip-2001.db8.ca2.4..10']/instance_attributes[@id='ip-2001.db8.ca2.4..10-instance_attributes']\
+    # /nvpair[@id='ip-2001.db8.ca2.4..10-instance_attributes-cidr_netmask']
+    vip_xpath_query="//resources/primitive[@type='IPaddr2']/instance_attributes/nvpair[@name='cidr_netmask' and @value='64']"
+    vip_xpath_xml_addresses=$(cibadmin --query --xpath "$vip_xpath_query" -e 2>/dev/null)
+    # The following extracts the @id value of the resource
+    vip_resources_to_fix=$(echo -e "$vip_xpath_xml_addresses" | sed -n "s/.*primitive\[@id='\([^']*\)'.*/\1/p")
+    # Runnning this in a subshell so that sourcing files cannot possibly affect the running script
+    (
+        OCF_PATH="/usr/lib/ocf/lib/heartbeat"
+        if [ -n "$vip_resources_to_fix" -a -f $OCF_PATH/ocf-shellfuncs -a -f $OCF_PATH/findif.sh ]; then
+            source $OCF_PATH/ocf-shellfuncs
+            source $OCF_PATH/findif.sh
+            for resource in $vip_resources_to_fix; do
+                echo "Updating IPv6 VIP $resource with a /128 and a correct addrlabel"
+                # The following will give us something like:
+                # <nvpair id="ip-2001.db8.ca2.4..10-instance_attributes-ip" name="ip" value="2001:db8:ca2:4::10"/>
+                ip_cib_nvpair=$(cibadmin --query --xpath "//resources/primitive[@type='IPaddr2' and @id='$resource']/instance_attributes/nvpair[@name='ip']")
+                # Let's filter out the value of the nvpair to get the ip address
+                ip_address=$(echo $ip_cib_nvpair | xmllint --xpath 'string(//nvpair/@value)' -)
+                OCF_RESKEY_cidr_netmask="64"
+                OCF_RESKEY_ip="$ip_address"
+                # Unfortunately due to https://bugzilla.redhat.com/show_bug.cgi?id=1445628
+                # we need to find out the appropiate nic given the ip address.
+                nic=$(findif $ip_address | awk '{ print $1 }')
+                ret=$?
+                if [ -z "$nic" -o $ret -ne 0 ]; then
+                    echo "NIC autodetection failed for VIP $ip_address, not updating VIPs"
+                    # Only exits the subshell
+                    exit 1
+                fi
+                ocf_run -info pcs resource update --wait "$resource" ip="$ip_address" cidr_netmask=128 nic="$nic" lvs_ipv6_addrlabel=true lvs_ipv6_addrlabel_value=99
+                ret=$?
+                if [ $ret -ne 0 ]; then
+                    echo "pcs resource update for VIP $resource failed, not updating VIPs"
+                    # Only exits the subshell
+                    exit 1
+                fi
+            done
+        fi
+    )
+}
+
+# https://bugs.launchpad.net/tripleo/+bug/1704131 guard against yum update
+# waiting for an existing process until the heat stack time out
+function check_for_yum_lock {
+    if [[ -f /var/run/yum.pid ]] ; then
+        ERR="ERROR existing yum.pid detected - can't continue! Please ensure
+there is no other package update process for the duration of the minor update
+worfklow. Exiting."
+        echo $ERR
+        exit 1
+   fi
+}

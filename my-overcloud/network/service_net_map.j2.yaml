@@ -42,7 +42,7 @@ parameters:
       CinderApiNetwork: internal_api
       CinderIscsiNetwork: storage
       CongressApiNetwork: internal_api
-      GlanceApiNetwork: storage
+      GlanceApiNetwork: internal_api
       IronicApiNetwork: ctlplane
       IronicNetwork: ctlplane
       KeystoneAdminApiNetwork: ctlplane # allows undercloud to config endpoints
@@ -54,6 +54,7 @@ parameters:
       HeatApiCfnNetwork: internal_api
       HeatApiCloudwatchNetwork: internal_api
       NovaApiNetwork: internal_api
+      NovaColdMigrationNetwork: ctlplane
       NovaPlacementNetwork: internal_api
       NovaMetadataNetwork: internal_api
       NovaVncProxyNetwork: internal_api
